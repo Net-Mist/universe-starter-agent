@@ -93,3 +93,127 @@ class LSTMPolicy(object):
     def value(self, ob, c, h):
         sess = tf.get_default_session()
         return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})[0]
+
+
+class VINPolicy(object):
+    def __init__(self, ob_space, ac_space):
+        # self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
+        self.x = tf.placeholder(tf.float32, [None, 4, 42, 42], name='X')
+        x = tf.transpose(self.x, [0, 2, 3, 1], name='Xt')
+        # print(1, ob_space)(42, 42, 1)
+        # print(3, [None] + list(ob_space))[None, 42, 42, 1]
+
+        # Compute the state
+        with tf.variable_scope('State'):
+            with tf.variable_scope('conv{}'.format(0)):
+                filter = tf.get_variable('filter', [3, 3, 4, 32],
+                                         initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                         dtype=tf.float32)
+                conv = tf.nn.conv2d(x, filter, [1, 2, 2, 1], padding='SAME')
+                bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
+                hidden_state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
+            for i in range(3):
+                with tf.variable_scope('conv{}'.format(i + 1)):
+                    filter = tf.get_variable('filter', [3, 3, 32, 32],
+                                             initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                             dtype=tf.float32)
+                    conv = tf.nn.conv2d(hidden_state, filter, [1, 2, 2, 1], padding='SAME')
+                    bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
+                    hidden_state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
+                    # has the ability to see the whole state
+
+            hidden_state = flatten(hidden_state)
+
+            with tf.variable_scope('Linear_State'):
+                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160], initializer=normalized_columns_initializer(0.01))
+                b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
+                state = tf.matmul(hidden_state, w) + b
+
+        # Compute R
+        with tf.variable_scope('Reward'):
+            with tf.variable_scope('conv{}'.format(0)):
+                filter = tf.get_variable('filter', [3, 3, 4, 32],
+                                         initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                         dtype=tf.float32)
+                conv = tf.nn.conv2d(x, filter, [1, 2, 2, 1], padding='SAME')
+                bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
+                hidden_state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
+            for i in range(3):
+                with tf.variable_scope('conv{}'.format(i + 1)):
+                    filter = tf.get_variable('filter', [3, 3, 32, 32],
+                                             initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                             dtype=tf.float32)
+                    conv = tf.nn.conv2d(hidden_state, filter, [1, 2, 2, 1], padding='SAME')
+                    bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
+                    hidden_state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
+                    # has the ability to see the whole state
+
+            hidden_state = flatten(hidden_state)
+
+            with tf.variable_scope('Linear_State'):
+                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160],
+                                    initializer=normalized_columns_initializer(0.01))
+                b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
+                r = tf.matmul(hidden_state, w) + b
+
+
+        # VIN Part
+        v = tf.fill(tf.shape(r), 0.0)
+        v = tf.expand_dims(v, 2)
+        r = tf.expand_dims(r, 2)
+        with tf.variable_scope('vi') as scope:
+            for irec in range(30):
+                with tf.name_scope('iter%d' % irec):
+                    if irec == 1:
+                        scope.reuse_variables()
+                    # concatenate V with R
+                    v_concat = tf.concat_v2([v, r], 2)
+
+                    filters = tf.get_variable('weights', [3, 2, ac_space],
+                                              initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                              dtype=tf.float32)
+                    conv = tf.nn.conv1d(v_concat, filters, 1, padding='SAME')
+                    biases = tf.get_variable('bias', [ac_space], initializer=tf.constant_initializer(0.0))
+                    q = tf.nn.bias_add(conv, biases, name="Q")
+                    # activation_summary(Q)
+                    v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True,
+                                      name="V")  # TODO : reduction_indices is deprecated, use axis instead
+
+        # attention part
+        with tf.name_scope('attention'):
+            Qa_img = tf.mul(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
+            Qa = tf.reduce_sum(Qa_img, [1], name="Qa")
+
+        # reactive policy (dense layer with softmax?)
+        with tf.name_scope('softmax_linear'):
+            w = tf.get_variable("w", [ac_space, ac_space],
+                                initializer=normalized_columns_initializer(0.01))
+            biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
+
+            self.logits = tf.matmul(Qa, w) + biases
+            softact = tf.nn.softmax(self.logits, name='softact')
+
+        # Second attention part for the V_f computation
+        with tf.name_scope('attention2'):
+            self.vf = tf.mul(tf.reduce_sum(v, [2]), state, name='Vf_img')
+            self.vf = tf.reduce_sum(self.vf, [1], name="Vf")
+
+        # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
+        # self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
+        # self.state_out = [None, None]
+        self.sample = categorical_sample(self.logits, ac_space)[0, :]
+        self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
+
+    def get_initial_features(self):
+        c_init = np.zeros((1, 1), np.float32)
+        h_init = np.zeros((1, 1), np.float32)
+        return [c_init, h_init]
+
+    def act(self, ob):
+        sess = tf.get_default_session()
+        return sess.run([self.sample, self.vf],
+                        {self.x: [ob]})
+
+    def value(self, ob):
+        sess = tf.get_default_session()
+        return sess.run(self.vf, {self.x: [ob]})[0]

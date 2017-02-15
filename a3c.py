@@ -3,12 +3,15 @@ from collections import namedtuple
 import numpy as np
 import tensorflow as tf
 from model import LSTMPolicy
+from model import VINPolicy
 import six.moves.queue as queue
 import scipy.signal
 import threading
 import distutils.version
 
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
+
+use_vin_policy = True
 
 
 def discount(x, gamma):
@@ -125,21 +128,35 @@ runner appends the policy to the queue.
         terminal_end = False
         rollout = PartialRollout()
 
-        for _ in range(num_local_steps):
-            fetched = policy.act(last_state, *last_features)
-            action, value_, features = fetched[0], fetched[1], fetched[2:]
+        for i in range(num_local_steps):
+            if use_vin_policy:
+                if i == 0:
+                    last_4_frames = [last_state[:, :, 0], last_state[:, :, 0], last_state[:, :, 0], last_state[:, :, 0]]
+                else:
+                    last_4_frames = [last_state[:, :, 0]] + last_4_frames[:3]
+
+                fetched = policy.act(last_4_frames)
+                action, value_ = fetched[0], fetched[1]
+            else:
+                fetched = policy.act(last_state, *last_features)
+                action, value_, features = fetched[0], fetched[1], fetched[2:]
+
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
             if render:
                 env.render()
 
             # collect the experience
-            rollout.add(last_state, action, reward, value_, terminal, last_features)
+            if use_vin_policy:
+                rollout.add(last_4_frames, action, reward, value_, terminal, last_features)
+            else:
+                rollout.add(last_state, action, reward, value_, terminal, last_features)
             length += 1
             rewards += reward
 
             last_state = state
-            last_features = features
+            if not use_vin_policy:
+                last_features = features
 
             if info:
                 summary = tf.Summary()
@@ -160,7 +177,10 @@ runner appends the policy to the queue.
                 break
 
         if not terminal_end:
-            rollout.r = policy.value(last_state, *last_features)
+            if use_vin_policy:
+                rollout.r = policy.value(last_4_frames)
+            else:
+                rollout.r = policy.value(last_state, *last_features)
 
         # once we have enough experience, yield it, and have the ThreadRunner place it on a queue
         yield rollout
@@ -180,14 +200,20 @@ should be computed.
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
-                self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                if use_vin_policy:
+                    self.network = VINPolicy(env.observation_space.shape, env.action_space.n)
+                else:
+                    self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
                 self.global_step = tf.get_variable("global_step", [], tf.int32,
                                                    initializer=tf.constant_initializer(0, dtype=tf.int32),
                                                    trainable=False)
 
         with tf.device(worker_device):
             with tf.variable_scope("local"):
-                self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                if use_vin_policy:
+                    self.local_network = pi = VINPolicy(env.observation_space.shape, env.action_space.n)
+                else:
+                    self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
                 pi.global_step = self.global_step
 
             self.ac = tf.placeholder(tf.float32, [None, env.action_space.n], name="ac")
@@ -223,7 +249,8 @@ should be computed.
                 tf.summary.scalar("model/policy_loss", pi_loss / bs)
                 tf.summary.scalar("model/value_loss", vf_loss / bs)
                 tf.summary.scalar("model/entropy", entropy / bs)
-                tf.summary.image("model/state", pi.x)
+                if not use_vin_policy:
+                    tf.summary.image("model/state", pi.x)
                 tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
                 tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list))
                 self.summary_op = tf.summary.merge_all()
@@ -232,7 +259,8 @@ should be computed.
                 tf.scalar_summary("model/policy_loss", pi_loss / bs)
                 tf.scalar_summary("model/value_loss", vf_loss / bs)
                 tf.scalar_summary("model/entropy", entropy / bs)
-                tf.image_summary("model/state", pi.x)
+                if not use_vin_policy:
+                    tf.image_summary("model/state", pi.x)
                 tf.scalar_summary("model/grad_global_norm", tf.global_norm(grads))
                 tf.scalar_summary("model/var_global_norm", tf.global_norm(pi.var_list))
                 self.summary_op = tf.merge_all_summaries()
@@ -285,14 +313,22 @@ server.
         else:
             fetches = [self.train_op, self.global_step]
 
-        feed_dict = {
-            self.local_network.x: batch.si,
-            self.ac: batch.a,
-            self.adv: batch.adv,
-            self.r: batch.r,
-            self.local_network.state_in[0]: batch.features[0],
-            self.local_network.state_in[1]: batch.features[1],
-        }
+        if use_vin_policy:
+            feed_dict = {
+                self.local_network.x: batch.si,
+                self.ac: batch.a,
+                self.adv: batch.adv,
+                self.r: batch.r,
+            }
+        else:
+            feed_dict = {
+                self.local_network.x: batch.si,
+                self.ac: batch.a,
+                self.adv: batch.adv,
+                self.r: batch.r,
+                self.local_network.state_in[0]: batch.features[0],
+                self.local_network.state_in[1]: batch.features[1],
+            }
 
         fetched = sess.run(fetches, feed_dict=feed_dict)
 
