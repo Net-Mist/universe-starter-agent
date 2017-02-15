@@ -11,7 +11,7 @@ import distutils.version
 
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
-use_vin_policy = True
+one_input_brain = ['LSTM']  # List of the brain that use only one input frame. The rest of the input are RNN data
 
 
 def discount(x, gamma):
@@ -82,7 +82,7 @@ is that a universe environment is _real time_.  This means that there should be 
 that would constantly interact with the environment and tell it what to do.  This thread is here.
 """
 
-    def __init__(self, env, policy, num_local_steps, visualise):
+    def __init__(self, env, policy, num_local_steps, visualise, brain):
         threading.Thread.__init__(self)
         self.queue = queue.Queue(5)
         self.num_local_steps = num_local_steps
@@ -93,6 +93,7 @@ that would constantly interact with the environment and tell it what to do.  Thi
         self.sess = None
         self.summary_writer = None
         self.visualise = visualise
+        self.brain = brain
 
     def start_runner(self, sess, summary_writer):
         self.sess = sess
@@ -104,7 +105,8 @@ that would constantly interact with the environment and tell it what to do.  Thi
             self._run()
 
     def _run(self):
-        rollout_provider = env_runner(self.env, self.policy, self.num_local_steps, self.summary_writer, self.visualise)
+        rollout_provider = env_runner(self.env, self.policy, self.num_local_steps, self.summary_writer, self.visualise,
+                                      self.brain)
         while True:
             # the timeout variable exists because apparently, if one worker dies, the other workers
             # won't die with it, unless the timeout is set to some large number.  This is an empirical
@@ -113,7 +115,7 @@ that would constantly interact with the environment and tell it what to do.  Thi
             self.queue.put(next(rollout_provider), timeout=600.0)
 
 
-def env_runner(env, policy, num_local_steps, summary_writer, render):
+def env_runner(env, policy, num_local_steps, summary_writer, render, brain):
     """
 The logic of the thread runner.  In brief, it constantly keeps on running
 the policy, and as long as the rollout exceeds a certain length, the thread
@@ -129,7 +131,7 @@ runner appends the policy to the queue.
         rollout = PartialRollout()
 
         for i in range(num_local_steps):
-            if use_vin_policy:
+            if brain not in one_input_brain:
                 if i == 0:
                     last_4_frames = [last_state[:, :, 0], last_state[:, :, 0], last_state[:, :, 0], last_state[:, :, 0]]
                 else:
@@ -147,7 +149,7 @@ runner appends the policy to the queue.
                 env.render()
 
             # collect the experience
-            if use_vin_policy:
+            if brain not in one_input_brain:
                 rollout.add(last_4_frames, action, reward, value_, terminal, last_features)
             else:
                 rollout.add(last_state, action, reward, value_, terminal, last_features)
@@ -155,7 +157,7 @@ runner appends the policy to the queue.
             rewards += reward
 
             last_state = state
-            if not use_vin_policy:
+            if brain in one_input_brain:
                 last_features = features
 
             if info:
@@ -177,7 +179,7 @@ runner appends the policy to the queue.
                 break
 
         if not terminal_end:
-            if use_vin_policy:
+            if brain not in one_input_brain:
                 rollout.r = policy.value(last_4_frames)
             else:
                 rollout.r = policy.value(last_state, *last_features)
@@ -187,33 +189,38 @@ runner appends the policy to the queue.
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise):
+    def __init__(self, env, task, visualise, brain):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
 But overall, we'll define the model, specify its inputs, and describe how the policy gradients step
 should be computed.
 """
-
+        self.brain = brain
         self.env = env
         self.task = task
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
-                if use_vin_policy:
+                if brain == 'VIN':
                     self.network = VINPolicy(env.observation_space.shape, env.action_space.n)
-                else:
+                elif brain == 'LSTM':
                     self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                else:
+                    print("Unknown brain structure")
                 self.global_step = tf.get_variable("global_step", [], tf.int32,
                                                    initializer=tf.constant_initializer(0, dtype=tf.int32),
                                                    trainable=False)
 
         with tf.device(worker_device):
             with tf.variable_scope("local"):
-                if use_vin_policy:
+                if brain == 'VIN':
                     self.local_network = pi = VINPolicy(env.observation_space.shape, env.action_space.n)
-                else:
+                elif brain == 'LSTM':
                     self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                else:
+                    print("Unknown brain structure")
+
                 pi.global_step = self.global_step
 
             self.ac = tf.placeholder(tf.float32, [None, env.action_space.n], name="ac")
@@ -241,7 +248,7 @@ should be computed.
             # on the one hand;  but on the other hand, we get less frequent parameter updates, which
             # slows down learning.  In this code, we found that making local steps be much
             # smaller than 20 makes the algorithm more difficult to tune and to get to work.
-            self.runner = RunnerThread(env, pi, 20, visualise)
+            self.runner = RunnerThread(env, pi, 20, visualise, brain)
 
             grads = tf.gradients(self.loss, pi.var_list)
 
@@ -249,7 +256,7 @@ should be computed.
                 tf.summary.scalar("model/policy_loss", pi_loss / bs)
                 tf.summary.scalar("model/value_loss", vf_loss / bs)
                 tf.summary.scalar("model/entropy", entropy / bs)
-                if not use_vin_policy:
+                if brain in one_input_brain:
                     tf.summary.image("model/state", pi.x)
                 tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
                 tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list))
@@ -259,7 +266,7 @@ should be computed.
                 tf.scalar_summary("model/policy_loss", pi_loss / bs)
                 tf.scalar_summary("model/value_loss", vf_loss / bs)
                 tf.scalar_summary("model/entropy", entropy / bs)
-                if not use_vin_policy:
+                if brain in one_input_brain:
                     tf.image_summary("model/state", pi.x)
                 tf.scalar_summary("model/grad_global_norm", tf.global_norm(grads))
                 tf.scalar_summary("model/var_global_norm", tf.global_norm(pi.var_list))
@@ -313,7 +320,7 @@ server.
         else:
             fetches = [self.train_op, self.global_step]
 
-        if use_vin_policy:
+        if self.brain not in one_input_brain:
             feed_dict = {
                 self.local_network.x: batch.si,
                 self.ac: batch.a,

@@ -25,9 +25,9 @@ class FastSaver(tf.train.Saver):
                                     meta_graph_suffix, False)
 
 
-def run(args, server):
+def run(args, server, brain):
     env = create_env(args.env_id, client_id=str(args.task), remotes=args.remotes)
-    trainer = A3C(env, args.task, args.visualise)
+    trainer = A3C(env, args.task, args.visualise, brain)
 
     # Variable names that start with "local" are not saved in checkpoints.
     if use_tf12_api:
@@ -131,6 +131,10 @@ Setting up Tensorflow for data parallel work
     parser.add_argument('--visualise', action='store_true',
                         help="Visualise the gym environment by running env.render() between each timestep")
 
+    # Add brain argument
+    parser.add_argument('-b', '--brain', type=str, default='VIN',
+                        help="the network to use. Default: VIN. VIN, LSTM")
+
     args = parser.parse_args()
     spec = cluster_spec(args.num_workers, 1)
     cluster = tf.train.ClusterSpec(spec).as_cluster_def()
@@ -146,7 +150,7 @@ Setting up Tensorflow for data parallel work
     if args.job_name == "worker":
         server = tf.train.Server(cluster, job_name="worker", task_index=args.task,
                                  config=tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
-        run(args, server)
+        run(args, server, args.brain)
     else:
         server = tf.train.Server(cluster, job_name="ps", task_index=args.task,
                                  config=tf.ConfigProto(device_filters=["/job:ps"]))

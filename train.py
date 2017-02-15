@@ -17,6 +17,8 @@ parser.add_argument('-n', '--dry-run', action='store_true',
                     help="Print out commands rather than executing them")
 parser.add_argument('-m', '--mode', type=str, default='tmux',
                     help="tmux: run workers in a tmux session. nohup: run workers with nohup. child: run workers as child processes")
+parser.add_argument('-b', '--brain', type=str, default='VIN',
+                    help="the network to use. Default: VIN. VIN, LSTM")
 
 # Add visualise tag
 parser.add_argument('--visualise', action='store_true',
@@ -36,7 +38,7 @@ def new_cmd(session, name, cmd, mode, logdir, shell):
                                                                                             logdir)
 
 
-def create_commands(session, num_workers, remotes, env_id, logdir, shell='bash', mode='tmux', visualise=False):
+def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False):
     # for launching the TF workers and for launching tensorboard
     base_cmd = [
         'CUDA_VISIBLE_DEVICES=',
@@ -54,11 +56,12 @@ def create_commands(session, num_workers, remotes, env_id, logdir, shell='bash',
         remotes = remotes.split(',')
         assert len(remotes) == num_workers
 
-    cmds_map = [new_cmd(session, "ps", base_cmd + ["--job-name", "ps"], mode, logdir, shell)]
+    cmds_map = [new_cmd(session, "ps", base_cmd + ["--job-name", "ps", "--brain", brain], mode, logdir, shell)]
     for i in range(num_workers):
         cmds_map += [new_cmd(session,
-                             "w-%d" % i, base_cmd + ["--job-name", "worker", "--task", str(i), "--remotes", remotes[i]],
-                             mode, logdir, shell)]
+                             "w-%d" % i,
+                             base_cmd + ["--job-name", "worker", "--task", str(i), "--remotes", remotes[i], "--brain",
+                                         brain], mode, logdir, shell)]
 
     cmds_map += [new_cmd(session, "tb", ["tensorboard", "--logdir", logdir, "--port", "12345"], mode, logdir, shell)]
     if mode == 'tmux':
@@ -98,7 +101,14 @@ def create_commands(session, num_workers, remotes, env_id, logdir, shell='bash',
 
 def run():
     args = parser.parse_args()
-    cmds, notes = create_commands("a3c", args.num_workers, args.remotes, args.env_id, args.log_dir, mode=args.mode,
+
+    # Check the brain structure
+    if args.brain not in ['LSTM', 'VIN']:
+        print('Unknown brain structure')
+        exit()
+
+    cmds, notes = create_commands("a3c", args.num_workers, args.remotes, args.env_id, args.log_dir, args.brain,
+                                  mode=args.mode,
                                   visualise=args.visualise)
     if args.dry_run:
         print("Dry-run mode due to -n flag, otherwise the following commands would be executed:")
