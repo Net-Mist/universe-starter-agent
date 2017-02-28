@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 from model import LSTMPolicy
 from model import VINPolicy
+from model import FFPolicy
 import six.moves.queue as queue
 import scipy.signal
 import threading
@@ -206,6 +207,8 @@ should be computed.
                     self.network = VINPolicy(env.observation_space.shape, env.action_space.n)
                 elif brain == 'LSTM':
                     self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                elif brain == 'FF':
+                    self.network = pi = FFPolicy(env.observation_space.shape, env.action_space.n)
                 else:
                     print("Unknown brain structure")
                 self.global_step = tf.get_variable("global_step", [], tf.int32,
@@ -218,6 +221,8 @@ should be computed.
                     self.local_network = pi = VINPolicy(env.observation_space.shape, env.action_space.n)
                 elif brain == 'LSTM':
                     self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                elif brain == 'FF':
+                    self.local_network = pi = FFPolicy(env.observation_space.shape, env.action_space.n)
                 else:
                     print("Unknown brain structure")
 

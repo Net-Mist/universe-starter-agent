@@ -133,7 +133,7 @@ Setting up Tensorflow for data parallel work
 
     # Add brain argument
     parser.add_argument('-b', '--brain', type=str, default='VIN',
-                        help="the network to use. Default: VIN. VIN, LSTM")
+                        help="the network to use. Default: VIN. VIN, LSTM, FF")
 
     args = parser.parse_args()
     spec = cluster_spec(args.num_workers, 1)

@@ -18,7 +18,7 @@ parser.add_argument('-n', '--dry-run', action='store_true',
 parser.add_argument('-m', '--mode', type=str, default='tmux',
                     help="tmux: run workers in a tmux session. nohup: run workers with nohup. child: run workers as child processes")
 parser.add_argument('-b', '--brain', type=str, default='VIN',
-                    help="the network to use. Default: VIN. VIN, LSTM")
+                    help="the network to use. Default: VIN. VIN, LSTM, FF")
 
 # Add visualise tag
 parser.add_argument('--visualise', action='store_true',
@@ -103,7 +103,7 @@ def run():
     args = parser.parse_args()
 
     # Check the brain structure
-    if args.brain not in ['LSTM', 'VIN']:
+    if args.brain not in ['LSTM', 'VIN', 'FF']:
         print('Unknown brain structure')
         exit()
 
