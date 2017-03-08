@@ -173,13 +173,6 @@ runner appends the policy to the queue.
             if brain in one_input_brain:
                 last_features = features
 
-            if info:
-                summary = tf.Summary()
-                for k, v in info.items():
-                    summary.value.add(tag=k, simple_value=float(v))
-                summary_writer.add_summary(summary, policy.global_step.eval())
-                summary_writer.flush()
-
             timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
             if terminal or length >= timestep_limit:
                 terminal_end = True
@@ -188,6 +181,14 @@ runner appends the policy to the queue.
                     last_state = process_frame42(last_state)
                 last_features = policy.get_initial_features()
                 print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
+
+                summary = tf.Summary()
+                summary.value.add(tag="episode/reward", simple_value=float(rewards))
+                summary.value.add(tag="episode/length", simple_value=float(length))
+                summary_writer.add_summary(summary, policy.global_step.eval())
+                summary_writer.flush()
+
+
                 length = 0
                 rewards = 0
                 break
@@ -324,7 +325,7 @@ server.
         rollout = self.pull_batch_from_queue()
         batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
 
-        should_compute_summary = self.task == 0 and self.local_steps % 11 == 0
+        should_compute_summary = self.task == 0 and self.local_steps % 100 == 0
 
         if should_compute_summary:
             fetches = [self.summary_op, self.train_op, self.global_step]
