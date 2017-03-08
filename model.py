@@ -188,6 +188,14 @@ class VINPolicy(object):
                     v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True,
                                       name="V")  # TODO : reduction_indices is deprecated, use axis instead
 
+        splits = tf.split(2, ac_space, filters)
+        for i in range(ac_space):
+            splits2 = tf.split(1, 2, splits[i])
+            for j in range(2):
+                splits3 = tf.split(0, 3, splits2[j])
+                for k in range(3):
+                    tf.summary.scalar("transition_function/action" + str(i)+"_"+str(j)+"_"+str(k), splits3[k][0, 0, 0])
+
         # attention part
         with tf.name_scope('attention'):
             Qa_img = tf.mul(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
