@@ -539,3 +539,61 @@ class FFPolicy(object):
     def value(self, ob):
         sess = tf.get_default_session()
         return sess.run(self.vf, {self.x: [ob]})[0]
+
+
+class DeepMindPolicy(object):
+    def __init__(self, ob_space, ac_space):
+        # self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
+        self.x = tf.placeholder(tf.float32, [None, 4, 84, 84], name='X')
+        x = tf.transpose(self.x, [0, 2, 3, 1], name='Xt')
+        # print(1, ob_space)(42, 42, 1)
+        # print(3, [None] + list(ob_space))[None, 42, 42, 1]
+
+        # Compute the state
+        with tf.variable_scope('State'):
+            with tf.variable_scope('conv{}'.format(0)):
+                filter = tf.get_variable('filter', [8, 8, 4, 16],
+                                         initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                         dtype=tf.float32)
+                conv = tf.nn.conv2d(x, filter, [1, 4, 4, 1], padding='SAME')
+                bias = tf.get_variable('bias', [16], initializer=tf.constant_initializer(0.0))
+                hidden_state = tf.nn.tanh(tf.nn.bias_add(conv, bias, name="hidden"))
+
+            with tf.variable_scope('conv{}'.format(1)):
+                filter = tf.get_variable('filter', [4, 4, 16, 32],
+                                         initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
+                                         dtype=tf.float32)
+                conv = tf.nn.conv2d(hidden_state, filter, [1, 2, 2, 1], padding='SAME')
+                bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
+                hidden_state = tf.nn.tanh(tf.nn.bias_add(conv, bias, name="hidden"))
+                # has the ability to see the whole state
+
+            hidden_state = flatten(hidden_state)
+
+            with tf.variable_scope('Linear_State'):
+                w = tf.get_variable("w", [hidden_state.get_shape()[1], 256],
+                                    initializer=normalized_columns_initializer(0.01))
+                b = tf.get_variable("b", [256], initializer=tf.constant_initializer(0))
+                state = tf.nn.relu(tf.matmul(hidden_state, w) + b)
+
+        with tf.variable_scope('Action'):
+            self.logits = linear(state, ac_space, "action", normalized_columns_initializer(0.01))
+        with tf.variable_scope('Value'):
+            self.vf = tf.reshape(linear(state, 1, "value", normalized_columns_initializer(1.0)), [-1])
+
+        self.sample = categorical_sample(self.logits, ac_space)[0, :]
+        self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
+
+    def get_initial_features(self):
+        c_init = np.zeros((1, 1), np.float32)
+        h_init = np.zeros((1, 1), np.float32)
+        return [c_init, h_init]
+
+    def act(self, ob):
+        sess = tf.get_default_session()
+        return sess.run([self.sample, self.vf],
+                        {self.x: [ob]})
+
+    def value(self, ob):
+        sess = tf.get_default_session()
+        return sess.run(self.vf, {self.x: [ob]})[0]
