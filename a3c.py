@@ -1,18 +1,12 @@
 from __future__ import print_function
 from collections import namedtuple
-import numpy as np
-import tensorflow as tf
-from model import LSTMPolicy
-from model import VINPolicy
-from model import FFPolicy
 import six.moves.queue as queue
 import scipy.signal
 import threading
 import distutils.version
+from models import *
 
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
-
-one_input_brain = ['LSTM']  # List of the brain that use only one input frame. The rest of the input are RNN data
 
 
 def discount(x, gamma):
@@ -203,12 +197,8 @@ should be computed.
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
-                if brain == 'VIN':
-                    self.network = VINPolicy(env.observation_space.shape, env.action_space.n)
-                elif brain == 'LSTM':
-                    self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
-                elif brain == 'FF':
-                    self.network = pi = FFPolicy(env.observation_space.shape, env.action_space.n)
+                if brain in possible_model:
+                    self.network = model_name_to_class[brain](env.observation_space.shape, env.action_space.n)
                 else:
                     print("Unknown brain structure")
                 self.global_step = tf.get_variable("global_step", [], tf.int32,
@@ -217,12 +207,9 @@ should be computed.
 
         with tf.device(worker_device):
             with tf.variable_scope("local"):
-                if brain == 'VIN':
-                    self.local_network = pi = VINPolicy(env.observation_space.shape, env.action_space.n)
-                elif brain == 'LSTM':
-                    self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
-                elif brain == 'FF':
-                    self.local_network = pi = FFPolicy(env.observation_space.shape, env.action_space.n)
+                if brain in possible_model:
+                    self.local_network = pi = model_name_to_class[brain](env.observation_space.shape,
+                                                                         env.action_space.n)
                 else:
                     print("Unknown brain structure")
 

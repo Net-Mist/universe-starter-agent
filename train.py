@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 from six.moves import shlex_quote
+from models import *
 
 parser = argparse.ArgumentParser(description="Run commands")
 parser.add_argument('-w', '--num-workers', default=1, type=int,
@@ -103,7 +104,7 @@ def run():
     args = parser.parse_args()
 
     # Check the brain structure
-    if args.brain not in ['LSTM', 'VIN', 'FF']:
+    if args.brain not in possible_model:
         print('Unknown brain structure')
         exit()
 
