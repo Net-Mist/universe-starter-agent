@@ -5,8 +5,23 @@ import scipy.signal
 import threading
 import distutils.version
 from models import *
+import cv2
 
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
+
+
+def process_frame42(frame):
+    frame = frame[34:34 + 160, :160]
+    # Resize by half, then down to 42x42 (essentially mipmapping). If
+    # we resize directly we lose pixels that, when mapped to 42x42,
+    # aren't close enough to the pixel boundary.
+    frame = cv2.resize(frame, (80, 80))
+    frame = cv2.resize(frame, (42, 42))
+    frame = frame.mean(2)
+    frame = frame.astype(np.float32)
+    frame *= (1.0 / 255.0)
+    frame = np.reshape(frame, [42, 42, 1])
+    return frame
 
 
 def discount(x, gamma):
@@ -117,6 +132,8 @@ the policy, and as long as the rollout exceeds a certain length, the thread
 runner appends the policy to the queue.
 """
     last_state = env.reset()
+    last_state = process_frame42(last_state)
+
     last_features = policy.get_initial_features()
     length = 0
     rewards = 0
@@ -140,6 +157,7 @@ runner appends the policy to the queue.
 
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
+            state = process_frame42(state)
             if render:
                 env.render()
 
@@ -167,6 +185,7 @@ runner appends the policy to the queue.
                 terminal_end = True
                 if length >= timestep_limit or not env.metadata.get('semantics.autoreset'):
                     last_state = env.reset()
+                    last_state = process_frame42(last_state)
                 last_features = policy.get_initial_features()
                 print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
                 length = 0
