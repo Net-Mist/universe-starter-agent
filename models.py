@@ -35,7 +35,8 @@ def process_frame84(frame):
     frame = np.reshape(frame, [84, 84, 1])
     return frame
 
-possible_model = ['LSTM', 'VIN', 'FF', 'VINBigger', 'DeepMind']
+
+possible_model = ['LSTM', 'VIN', 'FF', 'FFWider', 'FFDeeper', 'FFWiderAndDeeper', 'VINBigger', 'DeepMind']
 one_input_brain = ['LSTM']  # List of the brain that use only one input frame. The rest of the input are RNN data
 
 model_name_to_class = {
@@ -43,7 +44,10 @@ model_name_to_class = {
     'VIN': VINPolicy,
     'VINBigger': VINBiggerPolicy,
     'FF': FFPolicy,
-    'DeepMind': DeepMindPolicy
+    'DeepMind': DeepMindPolicy,
+    'FFWider': FFWiderPolicy,
+    'FFDeeper': FFDeeperPolicy,
+    'FFWiderAndDeeper': FFWiderAndDeeperPolicy
 }
 
 model_name_to_process = {
@@ -51,5 +55,8 @@ model_name_to_process = {
     'VIN': process_frame42_pos,
     'VINBigger': process_frame42_pos,
     'FF': process_frame42_pos,
-    'DeepMind': process_frame84
+    'FFWider': process_frame42_pos,
+    'FFDeeper': process_frame42_pos,
+    'FFWiderAndDeeper': process_frame42_pos,
+    'DeepMind': process_frame84,
 }
