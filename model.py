@@ -1,6 +1,9 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.rnn as rnn
+import distutils.version
+
+use_tf100_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('1.0.0')
 
 
 def normalized_columns_initializer(std=1.0):
@@ -59,7 +62,10 @@ class LSTMPolicy(object):
         x = tf.expand_dims(flatten(x), [0])
 
         size = 256
-        lstm = rnn.rnn_cell.BasicLSTMCell(size, state_is_tuple=True)
+        if use_tf100_api:
+            lstm = rnn.BasicLSTMCell(size, state_is_tuple=True)
+        else:
+            lstm = rnn.rnn_cell.BasicLSTMCell(size, state_is_tuple=True)
         self.state_size = lstm.state_size
         step_size = tf.shape(self.x)[:1]
 
@@ -70,7 +76,10 @@ class LSTMPolicy(object):
         h_in = tf.placeholder(tf.float32, [1, lstm.state_size.h])
         self.state_in = [c_in, h_in]
 
-        state_in = rnn.rnn_cell.LSTMStateTuple(c_in, h_in)
+        if use_tf100_api:
+            state_in = rnn.LSTMStateTuple(c_in, h_in)
+        else:
+            state_in = rnn.rnn_cell.LSTMStateTuple(c_in, h_in)
         lstm_outputs, lstm_state = tf.nn.dynamic_rnn(
             lstm, x, initial_state=state_in, sequence_length=step_size,
             time_major=False)
@@ -125,7 +134,8 @@ class VINPolicy(object):
             hidden_state = flatten(hidden_state)
 
             with tf.variable_scope('Linear_State'):
-                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160], initializer=normalized_columns_initializer(0.01))
+                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160],
+                                    initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 state = tf.matmul(hidden_state, w) + b
 
@@ -155,7 +165,6 @@ class VINPolicy(object):
                                     initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 r = tf.matmul(hidden_state, w) + b
-
 
         # VIN Part
         v = tf.fill(tf.shape(r), 0.0)
@@ -217,6 +226,7 @@ class VINPolicy(object):
     def value(self, ob):
         sess = tf.get_default_session()
         return sess.run(self.vf, {self.x: [ob]})[0]
+
 
 # class VIN2DPolicy(object):
 #     def __init__(self, ob_space, ac_space):
@@ -370,7 +380,8 @@ class VINBiggerPolicy(object):
             hidden_state = flatten(hidden_state)
 
             with tf.variable_scope('Linear_State'):
-                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160], initializer=normalized_columns_initializer(0.01))
+                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160],
+                                    initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 state = tf.matmul(hidden_state, w) + b
 
@@ -400,7 +411,6 @@ class VINBiggerPolicy(object):
                                     initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 r = tf.matmul(hidden_state, w) + b
-
 
         # VIN Part
         v = tf.fill(tf.shape(r), 0.0)
@@ -445,7 +455,6 @@ class VINBiggerPolicy(object):
         with tf.variable_scope('Value'):
             self.vf = tf.reshape(linear(Qa, 1, "value", normalized_columns_initializer(1.0)), [-1])
 
-
         # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
         # self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
         # self.state_out = [None, None]
@@ -465,7 +474,6 @@ class VINBiggerPolicy(object):
     def value(self, ob):
         sess = tf.get_default_session()
         return sess.run(self.vf, {self.x: [ob]})[0]
-
 
 
 class FFPolicy(object):
@@ -498,7 +506,8 @@ class FFPolicy(object):
             hidden_state = flatten(hidden_state)
 
             with tf.variable_scope('Linear_State'):
-                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160], initializer=normalized_columns_initializer(0.01))
+                w = tf.get_variable("w", [hidden_state.get_shape()[1], 160],
+                                    initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 state = tf.matmul(hidden_state, w) + b
         with tf.variable_scope('Action'):
