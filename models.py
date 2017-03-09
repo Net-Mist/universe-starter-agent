@@ -5,7 +5,7 @@ import cv2
 def process_frame42_pos(frame):
     # print(frame.shape) # (210, 160, 3)
     # Convert to gray scale
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # Select interesting area
     frame = frame[34:34 + 160, :160]
     # Resize by half, then down to 42x42 (essentially mipmapping). If
@@ -13,7 +13,7 @@ def process_frame42_pos(frame):
     # aren't close enough to the pixel boundary.
     frame = cv2.resize(frame, (80, 80))
     frame = cv2.resize(frame, (42, 42))
-    # frame = frame.mean(2)
+    frame = frame.mean(2)
     frame = frame.astype(np.float32)
     frame *= (1.0 / 255.0)
     frame = np.reshape(frame, [42, 42, 1])
@@ -23,12 +23,12 @@ def process_frame42_pos(frame):
 def process_frame84(frame):
     # print(frame.shape) # (210, 160, 3)
     # Convert to gray scale
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # Select interesting area
     frame = frame[34:34 + 160, :160]
     # Resize  down to 84x84
     frame = cv2.resize(frame, (84, 84))
-    # frame = frame.mean(2)
+    frame = frame.mean(2)
     frame = frame.astype(np.float32)
     frame *= (2.0 / 255.0)
     frame -= 1.0
@@ -36,13 +36,13 @@ def process_frame84(frame):
     return frame
 
 
-possible_model = ['LSTM', 'VIN', 'FF', 'FFWider', 'FFDeeper', 'FFWiderAndDeeper', 'VINBigger', 'DeepMind']
+possible_model = ['LSTM', 'VIN', 'FF', 'FFWider', 'FFDeeper', 'FFWiderAndDeeper', 'VINDeeperCNN', 'DeepMind']
 one_input_brain = ['LSTM']  # List of the brain that use only one input frame. The rest of the input are RNN data
 
 model_name_to_class = {
     'LSTM': LSTMPolicy,
     'VIN': VINPolicy,
-    'VINBigger': VINBiggerPolicy,
+    'VINDeeperCNN': VINDeeperCNNPolicy,
     'FF': FFPolicy,
     'DeepMind': DeepMindPolicy,
     'FFWider': FFWiderPolicy,
@@ -53,7 +53,7 @@ model_name_to_class = {
 model_name_to_process = {
     'LSTM': process_frame42_pos,
     'VIN': process_frame42_pos,
-    'VINBigger': process_frame42_pos,
+    'VINDeeperCNN': process_frame42_pos,
     'FF': process_frame42_pos,
     'FFWider': process_frame42_pos,
     'FFDeeper': process_frame42_pos,

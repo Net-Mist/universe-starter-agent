@@ -6,7 +6,6 @@ import threading
 import distutils.version
 from models import *
 
-
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
 
@@ -173,7 +172,6 @@ runner appends the policy to the queue.
                 summary.value.add(tag="episode/length", simple_value=float(length))
                 summary_writer.add_summary(summary, policy.global_step.eval())
                 summary_writer.flush()
-
 
                 length = 0
                 rewards = 0
