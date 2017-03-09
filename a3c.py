@@ -188,7 +188,7 @@ runner appends the policy to the queue.
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise, brain):
+    def __init__(self, env, task, visualise, visualiseVIN, brain):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
@@ -198,6 +198,7 @@ should be computed.
         self.brain = brain
         self.env = env
         self.task = task
+        self.visualiseVIN = visualiseVIN
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
@@ -316,6 +317,10 @@ server.
         else:
             fetches = [self.train_op, self.global_step]
 
+        # Visualise self.local_network.r and self.local_network.state
+        if self.visualiseVIN:
+            fetches += [self.local_network.r, self.local_network.state]
+
         if self.brain not in one_input_brain:
             feed_dict = {
                 self.local_network.x: batch.si,
@@ -335,7 +340,12 @@ server.
 
         fetched = sess.run(fetches, feed_dict=feed_dict)
 
+        # Visualise self.local_network.r and self.local_network.state
+        if self.visualiseVIN:
+            print("r:", fetched[-2][0])
+            print("state:", fetched[-1][0])
+
         if should_compute_summary:
-            self.summary_writer.add_summary(tf.Summary.FromString(fetched[0]), fetched[-1])
+            self.summary_writer.add_summary(tf.Summary.FromString(fetched[0]), fetched[2])
             self.summary_writer.flush()
         self.local_steps += 1

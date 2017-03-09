@@ -138,6 +138,7 @@ class VINPolicy(object):
                                     initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 state = tf.matmul(hidden_state, w) + b
+        self.state = state
 
         # Compute R
         with tf.variable_scope('Reward'):
@@ -165,6 +166,7 @@ class VINPolicy(object):
                                     initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 r = tf.matmul(hidden_state, w) + b
+        self.r = r
 
         # VIN Part
         v = tf.fill(tf.shape(r), 0.0)

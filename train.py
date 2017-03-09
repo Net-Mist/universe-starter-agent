@@ -24,6 +24,8 @@ parser.add_argument('-b', '--brain', type=str, default='VIN',
 # Add visualise tag
 parser.add_argument('--visualise', action='store_true',
                     help="Visualise the gym environment by running env.render() between each timestep")
+parser.add_argument('--visualiseVIN', action='store_true',
+                    help="Visualise the State and Reward tensors between each timestep")
 
 
 def new_cmd(session, name, cmd, mode, logdir, shell):
@@ -39,7 +41,8 @@ def new_cmd(session, name, cmd, mode, logdir, shell):
                                                                                             logdir)
 
 
-def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False):
+def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False,
+                    visualiseVIN=False):
     # for launching the TF workers and for launching tensorboard
     base_cmd = [
         'CUDA_VISIBLE_DEVICES=',
@@ -50,6 +53,9 @@ def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell=
 
     if visualise:
         base_cmd += ['--visualise']
+
+    if visualiseVIN:
+        base_cmd += ['--visualiseVIN']
 
     if remotes is None:
         remotes = ["1"] * num_workers
@@ -113,7 +119,8 @@ def run():
 
     cmds, notes = create_commands("a3c", args.num_workers, args.remotes, args.env_id, args.log_dir, args.brain,
                                   mode=args.mode,
-                                  visualise=args.visualise)
+                                  visualise=args.visualise,
+                                  visualiseVIN=args.visualiseVIN)
     if args.dry_run:
         print("Dry-run mode due to -n flag, otherwise the following commands would be executed:")
     else:
