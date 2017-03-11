@@ -188,7 +188,7 @@ runner appends the policy to the queue.
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise, visualiseVIN, brain):
+    def __init__(self, env, task, visualise, visualiseVIN, brain, learning_rate):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
@@ -278,7 +278,7 @@ should be computed.
             inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])
 
             # each worker has a different set of adam optimizer parameters
-            opt = tf.train.AdamOptimizer(1e-4)
+            opt = tf.train.AdamOptimizer(learning_rate)
             self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
             self.summary_writer = None
             self.local_steps = 0

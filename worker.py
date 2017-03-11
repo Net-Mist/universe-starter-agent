@@ -23,9 +23,9 @@ class FastSaver(tf.train.Saver):
                                     meta_graph_suffix, False)
 
 
-def run(args, server, brain):
+def run(args, server, brain, learning_rate):
     env = create_env(args.env_id, client_id=str(args.task), remotes=args.remotes)
-    trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain)
+    trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain, learning_rate)
 
     # Variable names that start with "local" are not saved in checkpoints.
     if use_tf12_api:
@@ -68,7 +68,7 @@ def run(args, server, brain):
                              save_model_secs=30,
                              save_summaries_secs=30)
 
-    num_global_steps = 100000000
+    num_global_steps = 10000000000
 
     logger.info(
         "Starting session. If this hangs, we're mostly likely waiting to connect to the parameter server. " +
@@ -136,6 +136,10 @@ Setting up Tensorflow for data parallel work
     parser.add_argument('-b', '--brain', type=str, default='VIN',
                         help="the network to use. Default: VIN. VIN, LSTM, FF")
 
+    # learning_rate
+    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
+                        help="the learning rate. Default 1e-4")
+
     args = parser.parse_args()
     spec = cluster_spec(args.num_workers, 1)
     cluster = tf.train.ClusterSpec(spec).as_cluster_def()
@@ -151,7 +155,7 @@ Setting up Tensorflow for data parallel work
     if args.job_name == "worker":
         server = tf.train.Server(cluster, job_name="worker", task_index=args.task,
                                  config=tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
-        run(args, server, args.brain)
+        run(args, server, args.brain, args.learning_rate)
     else:
         server = tf.train.Server(cluster, job_name="ps", task_index=args.task,
                                  config=tf.ConfigProto(device_filters=["/job:ps"]))
