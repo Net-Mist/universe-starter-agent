@@ -116,8 +116,7 @@ The logic of the thread runner.  In brief, it constantly keeps on running
 the policy, and as long as the rollout exceeds a certain length, the thread
 runner appends the policy to the queue.
 """
-    last_state = env.reset()
-    last_state = model_name_to_process[brain](last_state)
+    last_state = model_name_to_process[brain](env.reset())
 
     last_features = policy.get_initial_features()
     length = 0
@@ -188,7 +187,7 @@ runner appends the policy to the queue.
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise, visualiseVIN, brain, learning_rate):
+    def __init__(self, env, task, visualise, visualiseVIN, brain, learning_rate, local_steps):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
@@ -245,7 +244,7 @@ should be computed.
             # on the one hand;  but on the other hand, we get less frequent parameter updates, which
             # slows down learning.  In this code, we found that making local steps be much
             # smaller than 20 makes the algorithm more difficult to tune and to get to work.
-            self.runner = RunnerThread(env, pi, 20, visualise, brain)
+            self.runner = RunnerThread(env, pi, local_steps, visualise, brain)
 
             grads = tf.gradients(self.loss, pi.var_list)
 
@@ -277,7 +276,7 @@ should be computed.
             grads_and_vars = list(zip(grads, self.network.var_list))
             inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])
 
-            # each worker has a different set of adam optimizer parameters
+            # each worker has a different set of adam optimizer parameters TODO try to move the two next line in the precedent section
             opt = tf.train.AdamOptimizer(learning_rate)
             self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
             self.summary_writer = None

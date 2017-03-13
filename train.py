@@ -24,6 +24,9 @@ parser.add_argument('-b', '--brain', type=str, default='VIN',
 # learning_rate
 parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
                     help="the learning rate. Default 1e-4")
+parser.add_argument('-ls', '--local_steps', type=float, default=20,
+                    help="the local steps. Default 20")
+
 
 # Add visualise tag
 parser.add_argument('--visualise', action='store_true',
@@ -46,7 +49,7 @@ def new_cmd(session, name, cmd, mode, logdir, shell):
 
 
 def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False,
-                    visualiseVIN=False, learning_rate=1e-4):
+                    visualiseVIN=False, learning_rate=1e-4, local_steps=20):
     # for launching the TF workers and for launching tensorboard
     base_cmd = [
         'CUDA_VISIBLE_DEVICES=',
@@ -55,6 +58,7 @@ def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell=
         '--env-id', env_id,
         '--num-workers', str(num_workers),
         '--learning_rate', str(learning_rate),
+        '--local_steps', str(local_steps)
     ]
 
     if visualise:
@@ -127,7 +131,8 @@ def run():
                                   mode=args.mode,
                                   visualise=args.visualise,
                                   visualiseVIN=args.visualiseVIN,
-                                  learning_rate=args.learning_rate)
+                                  learning_rate=args.learning_rate,
+                                  local_steps=args.local_steps)
     if args.dry_run:
         print("Dry-run mode due to -n flag, otherwise the following commands would be executed:")
     else:
