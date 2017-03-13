@@ -24,7 +24,7 @@ parser.add_argument('-b', '--brain', type=str, default='VIN',
 # learning_rate
 parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
                     help="the learning rate. Default 1e-4")
-parser.add_argument('-ls', '--local_steps', type=float, default=20,
+parser.add_argument('-ls', '--local_steps', type=int, default=20,
                     help="the local steps. Default 20")
 
 
