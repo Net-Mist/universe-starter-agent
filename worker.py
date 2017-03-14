@@ -47,7 +47,8 @@ def run(args, server, brain, learning_rate, local_steps):
         logger.info("Initializing all parameters.")
         ses.run(init_all_op)
 
-    config = tf.ConfigProto(device_filters=["/job:ps", "/job:worker/task:{}/cpu:0".format(args.task)])
+    config = tf.ConfigProto(device_filters=["/job:ps", "/job:worker/task:{}/cpu:0".format(args.task)],
+                            log_device_placement=False)
     logdir = os.path.join(args.log_dir, 'train')
 
     if use_tf12_api:
