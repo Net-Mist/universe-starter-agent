@@ -54,7 +54,8 @@ def categorical_sample(logits, d):
 
 class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
-        self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
+        self.x = x = tf.placeholder(tf.float32, [None, 42, 42, 1],
+                                    name='X')  # tf.placeholder(tf.float32, [None] + list(ob_space))
 
         for i in range(4):
             x = tf.nn.elu(conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2]))
