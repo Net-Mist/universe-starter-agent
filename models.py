@@ -2,6 +2,57 @@ from model import *
 import cv2
 
 
+def process_frame42_downsampled(frame):
+    """
+    Process the Atari frame to a 42*42 images in grayscale downsampled to 3 bits colors (as in A3C+ paper)
+    :param frame: the Atari frame, of shape (210, 160, 3)
+    :return: the processed frame
+    """
+
+    # Select interesting area of size 160*160*3
+    frame = frame[34:34 + 160, :160, :]
+    # Convert to gray scale
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Resize by half, then down to 42x42 (essentially mipmapping). If
+    # we resize directly we lose pixels that, when mapped to 42x42,
+    # aren't close enough to the pixel boundary.
+    frame = cv2.resize(frame, (80, 80))
+    frame = cv2.resize(frame, (42, 42))
+    # downsampled the image
+    frame = frame.astype(np.float32)
+    frame = np.uint8(frame / 255 * 8)  # TODO 8 in the paper, buy maybe try another value (128 ?)
+
+    # Final reshape
+    frame = np.reshape(frame, [42, 42, 1])
+    return frame
+
+
+def process_frame42_v2(frame):
+    """
+    Process the Atari frame to a 42*42 images in grayscale downsampled to 3 bits colors (as in A3C+ paper)
+    :param frame: the Atari frame, of shape (210, 160, 3)
+    :return: the processed frame
+    """
+
+    # Select interesting area of size 160*160*3
+    frame = frame[34:34 + 160, :160, :]
+    # Convert to gray scale
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Resize by half, then down to 42x42 (essentially mipmapping). If
+    # we resize directly we lose pixels that, when mapped to 42x42,
+    # aren't close enough to the pixel boundary.
+    frame = cv2.resize(frame, (80, 80))
+    frame = cv2.resize(frame, (42, 42))
+    # downsampled the image
+    frame = frame.astype(np.uint8)
+    frame *= 8. / 255.  # TODO 8 in the paper, buy maybe try another value (128 ?)
+
+    # Final
+    frame = frame.astype(np.float32)
+    frame = np.uint8(frame / 8)
+    return frame
+
+
 def process_frame42_pos(frame):
     # print(frame.shape) # (210, 160, 3)
     # Convert to gray scale

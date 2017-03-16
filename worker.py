@@ -23,9 +23,9 @@ class FastSaver(tf.train.Saver):
                                     meta_graph_suffix, False)
 
 
-def run(args, server, brain, learning_rate, local_steps):
+def run(args, server, brain, learning_rate, local_steps, a3cp):
     env = create_env(args.env_id, client_id=str(args.task), remotes=args.remotes)
-    trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain, learning_rate, local_steps)
+    trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain, learning_rate, local_steps, a3cp)
 
     # Variable names that start with "local" are not saved in checkpoints.
     if use_tf12_api:
@@ -142,6 +142,8 @@ Setting up Tensorflow for data parallel work
                         help="the learning rate. Default 1e-4")
     parser.add_argument('-ls', '--local_steps', type=int, default=20,
                         help="the local steps. Default 20")
+    parser.add_argument('--a3cp', action='store_true',
+                        help="use A3C+ algorithm")
 
     args = parser.parse_args()
     spec = cluster_spec(args.num_workers, 1)
@@ -158,7 +160,7 @@ Setting up Tensorflow for data parallel work
     if args.job_name == "worker":
         server = tf.train.Server(cluster, job_name="worker", task_index=args.task,
                                  config=tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
-        run(args, server, args.brain, args.learning_rate, args.local_steps)
+        run(args, server, args.brain, args.learning_rate, args.local_steps, args.a3cp)
     else:
         server = tf.train.Server(cluster, job_name="ps", task_index=args.task,
                                  config=tf.ConfigProto(device_filters=["/job:ps"]))

@@ -5,6 +5,7 @@ import scipy.signal
 import threading
 import distutils.version
 from models import *
+from pseudocount import PC
 
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
@@ -77,7 +78,7 @@ is that a universe environment is _real time_.  This means that there should be 
 that would constantly interact with the environment and tell it what to do.  This thread is here.
 """
 
-    def __init__(self, env, policy, num_local_steps, visualise, brain):
+    def __init__(self, env, policy, num_local_steps, visualise, brain, a3cp):
         threading.Thread.__init__(self)
         self.queue = queue.Queue(5)
         self.num_local_steps = num_local_steps
@@ -89,6 +90,7 @@ that would constantly interact with the environment and tell it what to do.  Thi
         self.summary_writer = None
         self.visualise = visualise
         self.brain = brain
+        self.a3cp = a3cp
 
     def start_runner(self, sess, summary_writer):
         self.sess = sess
@@ -101,7 +103,7 @@ that would constantly interact with the environment and tell it what to do.  Thi
 
     def _run(self):
         rollout_provider = env_runner(self.env, self.policy, self.num_local_steps, self.summary_writer, self.visualise,
-                                      self.brain)
+                                      self.brain, self.a3cp)
         while True:
             # the timeout variable exists because apparently, if one worker dies, the other workers
             # won't die with it, unless the timeout is set to some large number.  This is an empirical
@@ -110,7 +112,7 @@ that would constantly interact with the environment and tell it what to do.  Thi
             self.queue.put(next(rollout_provider), timeout=600.0)
 
 
-def env_runner(env, policy, num_local_steps, summary_writer, render, brain):
+def env_runner(env, policy, num_local_steps, summary_writer, render, brain, a3cp):
     """
 The logic of the thread runner.  In brief, it constantly keeps on running
 the policy, and as long as the rollout exceeds a certain length, the thread
@@ -121,6 +123,20 @@ runner appends the policy to the queue.
     last_features = policy.get_initial_features()
     length = 0
     rewards = 0
+
+    pc = None
+    multiplier = None
+    pc_repeat_time = None
+    pc_mult = None
+    pc_thre = None
+    pc_max_repeat_time = None
+    if a3cp:
+        pc = PC()
+        multiplier = 1
+        pc_repeat_time = 0
+        pc_mult = 2.5
+        pc_thre = 0.01
+        pc_max_repeat_time = 1000
 
     while True:
         terminal_end = False
@@ -140,7 +156,22 @@ runner appends the policy to the queue.
                 action, value_, features = fetched[0], fetched[1], fetched[2:]
 
             # argmax to convert from one-hot
-            state, reward, terminal, info = env.step(action.argmax())
+            state, openai_reward, terminal, info = env.step(action.argmax())
+            if a3cp:
+                pc_reward = pc.pc_reward(state) * multiplier  # TODO voir preprocessing state
+                reward = pc_reward + openai_reward
+                if pc_mult:
+                    if pc_reward < pc_thre:
+                        pc_repeat_time += 1
+                    else:
+                        pc_repeat_time = 0
+                    if pc_repeat_time >= pc_max_repeat_time:
+                        multiplier *= pc_mult
+                        pc_repeat_time = 0
+                        print('Multiplier for pc reward is getting bigger. Multiplier=' + str(multiplier))
+            else:
+                reward = openai_reward
+
             state = model_name_to_process[brain](state)
             if render:
                 env.render()
@@ -167,7 +198,7 @@ runner appends the policy to the queue.
                 print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
 
                 summary = tf.Summary()
-                summary.value.add(tag="episode/reward", simple_value=float(rewards))
+                summary.value.add(tag="episode/reward", simple_value=float(openai_reward))
                 summary.value.add(tag="episode/length", simple_value=float(length))
                 summary_writer.add_summary(summary, policy.global_step.eval())
                 summary_writer.flush()
@@ -187,7 +218,7 @@ runner appends the policy to the queue.
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise, visualiseVIN, brain, learning_rate, local_steps):
+    def __init__(self, env, task, visualise, visualiseVIN, brain, learning_rate, local_steps, a3cp):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
@@ -244,7 +275,7 @@ should be computed.
             # on the one hand;  but on the other hand, we get less frequent parameter updates, which
             # slows down learning.  In this code, we found that making local steps be much
             # smaller than 20 makes the algorithm more difficult to tune and to get to work.
-            self.runner = RunnerThread(env, pi, local_steps, visualise, brain)
+            self.runner = RunnerThread(env, pi, local_steps, visualise, brain, a3cp)
 
             grads = tf.gradients(self.loss, pi.var_list)
 
