@@ -123,6 +123,7 @@ runner appends the policy to the queue.
     last_features = policy.get_initial_features()
     length = 0
     rewards = 0
+    openai_rewards = 0
 
     pc = None
     multiplier = None
@@ -158,7 +159,7 @@ runner appends the policy to the queue.
             # argmax to convert from one-hot
             state, openai_reward, terminal, info = env.step(action.argmax())
             if a3cp:
-                pc_reward = pc.pc_reward(state) * multiplier  # TODO voir preprocessing state
+                pc_reward = pc.pc_reward(state) * multiplier
                 reward = pc_reward + openai_reward
                 if pc_mult:
                     if pc_reward < pc_thre:
@@ -183,6 +184,7 @@ runner appends the policy to the queue.
                 rollout.add(last_state, action, reward, value_, terminal, last_features)
             length += 1
             rewards += reward
+            openai_rewards += openai_reward
 
             last_state = state
             if brain in one_input_brain:
@@ -195,16 +197,22 @@ runner appends the policy to the queue.
                     last_state = env.reset()
                     last_state = model_name_to_process[brain](last_state)
                 last_features = policy.get_initial_features()
-                print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
+                if a3cp:
+                    print("Episode finished. Sum of game rewards: %d. PC-reward: %d Length: %d" % (
+                        openai_rewards, rewards, length))
+                else:
+                    print("Episode finished. Sum of rewards: %d. Length: %d" % (openai_rewards, length))
 
                 summary = tf.Summary()
-                summary.value.add(tag="episode/reward", simple_value=float(openai_reward))
+                summary.value.add(tag="episode/reward", simple_value=float(openai_rewards))
+                summary.value.add(tag="episode/PC-reward", simple_value=float(rewards))
                 summary.value.add(tag="episode/length", simple_value=float(length))
                 summary_writer.add_summary(summary, policy.global_step.eval())
                 summary_writer.flush()
 
                 length = 0
                 rewards = 0
+                openai_rewards = 0
                 break
 
         if not terminal_end:
