@@ -25,7 +25,8 @@ class FastSaver(tf.train.Saver):
 
 def run(args, server, brain, learning_rate, local_steps, a3cp):
     env = create_env(args.env_id, client_id=str(args.task), remotes=args.remotes)
-    trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain, learning_rate, local_steps, a3cp)
+    trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain, learning_rate, local_steps, a3cp,
+                  args.initial_lr, args.max_t)
 
     # Variable names that start with "local" are not saved in checkpoints.
     if use_tf12_api:
@@ -137,13 +138,17 @@ Setting up Tensorflow for data parallel work
     parser.add_argument('-b', '--brain', type=str, default='VIN',
                         help="the network to use. Default: VIN. VIN, LSTM, FF")
 
-    # learning_rate
-    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
-                        help="the learning rate. Default 1e-4")
     parser.add_argument('-ls', '--local_steps', type=int, default=20,
                         help="the local steps. Default 20")
     parser.add_argument('--a3cp', action='store_true',
                         help="use A3C+ algorithm")
+
+    parser.add_argument('--max_t', default=0, type=int,
+                        help="time step after then learning rate doesn't decrease anymore")
+    parser.add_argument('--initial_lr', default=0, type=float,
+                        help="the initial learning rate")
+    parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
+                        help="the final learning rate. Default 1e-4")
 
     args = parser.parse_args()
     spec = cluster_spec(args.num_workers, 1)

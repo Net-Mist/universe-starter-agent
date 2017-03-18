@@ -10,6 +10,21 @@ from pseudocount import PC
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
 
+def current_lr(t: int, max_t: int, initial_lr: float, final_lr: float) -> float:
+    """
+    Compute and return the current learning rate
+    :param t: time step
+    :param max_t: time step after then learning rate doesn't decrease anymore
+    :param initial_lr: initial learning rate
+    :param final_lr: final learning rate
+    :return: the current learning rate
+    """
+    if t <= max_t:
+        return (initial_lr - final_lr) * (max_t - t) / max_t + final_lr
+    else:
+        return final_lr
+
+
 def discount(x, gamma):
     return scipy.signal.lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
 
@@ -226,13 +241,18 @@ runner appends the policy to the queue.
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise, visualiseVIN, brain, learning_rate, local_steps, a3cp):
+    def __init__(self, env, task, visualise, visualiseVIN, brain, final_learning_rate, local_steps, a3cp, initial_lr=0,
+                 max_t=0):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
 But overall, we'll define the model, specify its inputs, and describe how the policy gradients step
 should be computed.
 """
+        self.initial_lr = initial_lr
+        self.final_lr = final_learning_rate
+        self.max_t = max_t
+
         self.brain = brain
         self.env = env
         self.task = task
@@ -286,6 +306,23 @@ should be computed.
             self.runner = RunnerThread(env, pi, local_steps, visualise, brain, a3cp)
 
             grads = tf.gradients(self.loss, pi.var_list)
+            grads, _ = tf.clip_by_global_norm(grads, 40.0)
+
+            # copy weights from the parameter server to the local model
+            self.sync = tf.group(*[v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)])
+
+            grads_and_vars = list(zip(grads, self.network.var_list))
+            inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])
+
+            # each worker has a different set of adam optimizer parameters
+            self.lr = tf.placeholder(tf.float32)
+            # opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.99)
+            # opt = tf.train.RMSPropOptimizer(self.lr, decay=0.99, momentum=0.0, epsilon=0.1, use_locking=False)
+            opt = tf.train.AdamOptimizer(self.lr)
+
+            self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
+            self.summary_writer = None
+            self.local_steps = 0
 
             if use_tf12_api:
                 tf.summary.scalar("model/policy_loss", pi_loss / bs)
@@ -295,6 +332,7 @@ should be computed.
                     tf.summary.image("model/state", pi.x)
                 tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
                 tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list))
+                tf.summary.scalar("model/lr", self.lr)
                 self.summary_op = tf.summary.merge_all()
 
             else:
@@ -305,22 +343,8 @@ should be computed.
                     tf.image_summary("model/state", pi.x)
                 tf.scalar_summary("model/grad_global_norm", tf.global_norm(grads))
                 tf.scalar_summary("model/var_global_norm", tf.global_norm(pi.var_list))
+                tf.scalar_summary("model/lr", self.lr)
                 self.summary_op = tf.merge_all_summaries()
-
-            grads, _ = tf.clip_by_global_norm(grads, 40.0)
-
-            # copy weights from the parameter server to the local model
-            self.sync = tf.group(*[v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)])
-
-            grads_and_vars = list(zip(grads, self.network.var_list))
-            inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])
-
-            # each worker has a different set of adam optimizer parameters
-            # opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.99)
-            opt = tf.train.AdamOptimizer(learning_rate)
-            self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
-            self.summary_writer = None
-            self.local_steps = 0
 
     def start(self, sess, summary_writer):
         self.runner.start_runner(sess, summary_writer)
@@ -360,8 +384,10 @@ server.
         if self.visualiseVIN:
             fetches += [self.local_network.r, self.local_network.state]
 
+        cur_global_step = self.global_step.eval()
         if self.brain not in one_input_brain:
             feed_dict = {
+                self.lr: current_lr(cur_global_step, self.max_t, self.initial_lr, self.final_lr),
                 self.local_network.x: batch.si,
                 self.ac: batch.a,
                 self.adv: batch.adv,
@@ -369,6 +395,7 @@ server.
             }
         else:
             feed_dict = {
+                self.lr: current_lr(cur_global_step, self.max_t, self.initial_lr, self.final_lr),
                 self.local_network.x: batch.si,
                 self.ac: batch.a,
                 self.adv: batch.adv,

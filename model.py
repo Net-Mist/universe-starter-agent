@@ -173,13 +173,14 @@ class VINPolicy(object):
         v = tf.fill(tf.shape(r), 0.0)
         v = tf.expand_dims(v, 2)
         r = tf.expand_dims(r, 2)
+        filters = None
         with tf.variable_scope('vi') as scope:
             for irec in range(30):
                 with tf.name_scope('iter%d' % irec):
                     if irec == 1:
                         scope.reuse_variables()
                     # concatenate V with R
-                    v_concat = tf.concat_v2([v, r], 2)
+                    v_concat = tf.concat([v, r], 2)
 
                     filters = tf.get_variable('weights', [3, 2, ac_space],
                                               initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
@@ -191,18 +192,18 @@ class VINPolicy(object):
                     v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True,
                                       name="V")  # TODO : reduction_indices is deprecated, use axis instead
 
-        splits = tf.split(2, ac_space, filters)
+        splits = tf.split(filters, ac_space, axis=2)
         for i in range(ac_space):
-            splits2 = tf.split(1, 2, splits[i])
+            splits2 = tf.split(splits[i], 2, axis=1)
             for j in range(2):
-                splits3 = tf.split(0, 3, splits2[j])
+                splits3 = tf.split(splits2[j], 3, axis=0)
                 for k in range(3):
                     tf.summary.scalar("transition_function/action" + str(i) + "_" + str(j) + "_" + str(k),
                                       splits3[k][0, 0, 0])
 
         # attention part
         with tf.name_scope('attention'):
-            Qa_img = tf.mul(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
+            Qa_img = tf.multiply(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
             Qa = tf.reduce_sum(Qa_img, [1], name="Qa")
 
         # reactive policy (dense layer with softmax?)
@@ -216,7 +217,7 @@ class VINPolicy(object):
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):
-            self.vf = tf.mul(tf.reduce_sum(v, [2]), state, name='Vf_img')
+            self.vf = tf.multiply(tf.reduce_sum(v, [2]), state, name='Vf_img')
             self.vf = tf.reduce_sum(self.vf, [1], name="Vf")
 
         # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
@@ -334,7 +335,7 @@ class VIN2DPolicy(object):
                     if irec == 1:
                         scope.reuse_variables()
                     # concatenate V with R
-                    v_concat = tf.concat_v2([v, r], 3)
+                    v_concat = tf.concat([v, r], 3)
 
                     filters = tf.get_variable('weights', [3, 3, 2, ac_space],
                                               initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
@@ -348,7 +349,7 @@ class VIN2DPolicy(object):
 
         # attention part
         with tf.name_scope('attention'):
-            Qa_img = tf.mul(q, tf.tile(state, [1, 1, 1, ac_space]), name='Qa_img')
+            Qa_img = tf.multiply(q, tf.tile(state, [1, 1, 1, ac_space]), name='Qa_img')
             Qa = tf.reduce_sum(Qa_img, [1, 2], name="Qa")
 
         # reactive policy (dense layer with softmax?)
@@ -362,7 +363,7 @@ class VIN2DPolicy(object):
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):
-            self.vf = tf.mul(v, state, name='Vf_img')
+            self.vf = tf.multiply(v, state, name='Vf_img')
             self.vf = tf.reduce_sum(self.vf, [1, 2, 3], name="Vf")
 
         # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
@@ -464,13 +465,14 @@ class VINDeeperCNNPolicy(object):
         v = tf.fill(tf.shape(r), 0.0)
         v = tf.expand_dims(v, 2)
         r = tf.expand_dims(r, 2)
+        filters = None
         with tf.variable_scope('vi') as scope:
             for irec in range(30):
                 with tf.name_scope('iter%d' % irec):
                     if irec == 1:
                         scope.reuse_variables()
                     # concatenate V with R
-                    v_concat = tf.concat_v2([v, r], 2)
+                    v_concat = tf.concat([v, r], 2)
 
                     filters = tf.get_variable('weights', [3, 2, ac_space],
                                               initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
@@ -482,18 +484,18 @@ class VINDeeperCNNPolicy(object):
                     v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True,
                                       name="V")  # TODO : reduction_indices is deprecated, use axis instead
 
-        splits = tf.split(2, ac_space, filters)
+        splits = tf.split(filters, ac_space, axis=2)
         for i in range(ac_space):
-            splits2 = tf.split(1, 2, splits[i])
+            splits2 = tf.split(splits[i], 2, axis=1)
             for j in range(2):
-                splits3 = tf.split(0, 3, splits2[j])
+                splits3 = tf.split(splits2[j], 3, axis=0)
                 for k in range(3):
                     tf.summary.scalar("transition_function/action" + str(i) + "_" + str(j) + "_" + str(k),
                                       splits3[k][0, 0, 0])
 
         # attention part
         with tf.name_scope('attention'):
-            Qa_img = tf.mul(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
+            Qa_img = tf.multiply(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
             Qa = tf.reduce_sum(Qa_img, [1], name="Qa")
 
         # reactive policy (dense layer with softmax?)
@@ -507,7 +509,7 @@ class VINDeeperCNNPolicy(object):
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):
-            self.vf = tf.mul(tf.reduce_sum(v, [2]), state, name='Vf_img')
+            self.vf = tf.multiply(tf.reduce_sum(v, [2]), state, name='Vf_img')
             self.vf = tf.reduce_sum(self.vf, [1], name="Vf")
 
         # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))

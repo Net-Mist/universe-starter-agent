@@ -20,8 +20,6 @@ parser.add_argument('-m', '--mode', type=str, default='tmux',
                     help="tmux: run workers in a tmux session. nohup: run workers with nohup. child: run workers as child processes")
 parser.add_argument('-b', '--brain', type=str, default='VIN',
                     help="the network to use. Default: VIN. VIN, LSTM, FF")
-parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
-                    help="the learning rate. Default 1e-4")
 parser.add_argument('-ls', '--local_steps', type=int, default=20,
                     help="the local steps. Default 20")
 parser.add_argument('--a3cp', action='store_true',
@@ -32,6 +30,13 @@ parser.add_argument('--visualise', action='store_true',
                     help="Visualise the gym environment by running env.render() between each timestep")
 parser.add_argument('--visualiseVIN', action='store_true',
                     help="Visualise the State and Reward tensors between each timestep")
+
+parser.add_argument('--max_t', default=0, type=int,
+                    help="time step after then learning rate doesn't decrease anymore")
+parser.add_argument('--initial_lr', default=0, type=float,
+                    help="the initial learning rate")
+parser.add_argument('-lr', '--learning_rate', type=float, default=1e-4,
+                    help="the final learning rate. Default 1e-4")
 
 
 def new_cmd(session, name, cmd, mode, logdir, shell):
@@ -48,7 +53,7 @@ def new_cmd(session, name, cmd, mode, logdir, shell):
 
 
 def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False,
-                    visualiseVIN=False, learning_rate=1e-4, local_steps=20, a3cp=False):
+                    visualiseVIN=False, learning_rate=1e-4, local_steps=20, a3cp=False, max_t=0, initial_lr=0):
     # for launching the TF workers and for launching tensorboard
     base_cmd = [
         'CUDA_VISIBLE_DEVICES=',
@@ -57,7 +62,9 @@ def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell=
         '--env-id', env_id,
         '--num-workers', str(num_workers),
         '--learning_rate', str(learning_rate),
-        '--local_steps', str(local_steps)
+        '--local_steps', str(local_steps),
+        '--initial_lr', str(initial_lr),
+        '--max_t', str(max_t)
     ]
 
     if visualise:
@@ -66,7 +73,7 @@ def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell=
     if visualiseVIN:
         base_cmd += ['--visualiseVIN']
 
-    if  a3cp:
+    if a3cp:
         base_cmd += ['--a3cp']
 
     if remotes is None:
@@ -135,7 +142,9 @@ def run():
                                   visualiseVIN=args.visualiseVIN,
                                   learning_rate=args.learning_rate,
                                   local_steps=args.local_steps,
-                                  a3cp=args.a3cp)
+                                  a3cp=args.a3cp,
+                                  max_t=args.max_t,
+                                  initial_lr=args.initial_lr)
     if args.dry_run:
         print("Dry-run mode due to -n flag, otherwise the following commands would be executed:")
     else:
