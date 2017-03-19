@@ -6,6 +6,7 @@ import threading
 import distutils.version
 from models import *
 from pseudocount import PC
+import math
 
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
@@ -20,7 +21,7 @@ def current_lr(t: int, max_t: int, initial_lr: float, final_lr: float) -> float:
     :return: the current learning rate
     """
     if t <= max_t:
-        return (initial_lr - final_lr) * (max_t - t) / max_t + final_lr
+        return math.exp((math.log(initial_lr) - math.log(final_lr)) * (max_t - t) / max_t + math.log(final_lr))
     else:
         return final_lr
 
@@ -220,7 +221,8 @@ runner appends the policy to the queue.
 
                 summary = tf.Summary()
                 summary.value.add(tag="episode/reward", simple_value=float(openai_rewards))
-                summary.value.add(tag="episode/PC-reward", simple_value=float(rewards))
+                if a3cp:
+                    summary.value.add(tag="episode/PC-reward", simple_value=float(rewards))
                 summary.value.add(tag="episode/length", simple_value=float(length))
                 summary_writer.add_summary(summary, policy.global_step.eval())
                 summary_writer.flush()
