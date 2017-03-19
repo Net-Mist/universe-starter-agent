@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-from six.moves import shlex_quote
+from shlex import quote as shlex_quote
 from models import *
 
 parser = argparse.ArgumentParser(description="Run commands")
@@ -17,7 +17,9 @@ parser.add_argument('-l', '--log-dir', type=str, default="/tmp/pong",
 parser.add_argument('-n', '--dry-run', action='store_true',
                     help="Print out commands rather than executing them")
 parser.add_argument('-m', '--mode', type=str, default='tmux',
-                    help="tmux: run workers in a tmux session. nohup: run workers with nohup. child: run workers as child processes")
+                    help="tmux: run workers in a tmux session. "
+                         "nohup: run workers with nohup. "
+                         "child: run workers as child processes")
 parser.add_argument('-b', '--brain', type=str, default='VIN',
                     help="the network to use. Default: VIN. VIN, LSTM, FF")
 parser.add_argument('-ls', '--local_steps', type=int, default=20,
@@ -53,7 +55,7 @@ def new_cmd(session, name, cmd, mode, logdir, shell):
 
 
 def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False,
-                    visualiseVIN=False, learning_rate=1e-4, local_steps=20, a3cp=False, max_t=0, initial_lr=0):
+                    visualise_vin=False, learning_rate=1e-4, local_steps=20, a3cp=False, max_t=0, initial_lr=0):
     # for launching the TF workers and for launching tensorboard
     base_cmd = [
         'CUDA_VISIBLE_DEVICES=',
@@ -70,7 +72,7 @@ def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell=
     if visualise:
         base_cmd += ['--visualise']
 
-    if visualiseVIN:
+    if visualise_vin:
         base_cmd += ['--visualiseVIN']
 
     if a3cp:
@@ -139,7 +141,7 @@ def run():
     cmds, notes = create_commands("a3c", args.num_workers, args.remotes, args.env_id, args.log_dir, args.brain,
                                   mode=args.mode,
                                   visualise=args.visualise,
-                                  visualiseVIN=args.visualiseVIN,
+                                  visualise_vin=args.visualiseVIN,
                                   learning_rate=args.learning_rate,
                                   local_steps=args.local_steps,
                                   a3cp=args.a3cp,

@@ -1,14 +1,10 @@
-from __future__ import print_function
 from collections import namedtuple
-import six.moves.queue as queue
+import queue
 import scipy.signal
 import threading
-import distutils.version
 from models import *
 from pseudocount import PC
 import math
-
-use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
 
 
 def current_lr(t: int, max_t: int, initial_lr: float, final_lr: float) -> float:
@@ -20,6 +16,10 @@ def current_lr(t: int, max_t: int, initial_lr: float, final_lr: float) -> float:
     :param final_lr: final learning rate
     :return: the current learning rate
     """
+
+    if max_t == 0 or initial_lr == 0:
+        return final_lr  # use fix LR
+
     if t <= max_t:
         return math.exp((math.log(initial_lr) - math.log(final_lr)) * (max_t - t) / max_t + math.log(final_lr))
     else:
@@ -326,27 +326,15 @@ should be computed.
             self.summary_writer = None
             self.local_steps = 0
 
-            if use_tf12_api:
-                tf.summary.scalar("model/policy_loss", pi_loss / bs)
-                tf.summary.scalar("model/value_loss", vf_loss / bs)
-                tf.summary.scalar("model/entropy", entropy / bs)
-                if brain in one_input_brain:
-                    tf.summary.image("model/state", pi.x)
-                tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
-                tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list))
-                tf.summary.scalar("model/lr", self.lr)
-                self.summary_op = tf.summary.merge_all()
-
-            else:
-                tf.scalar_summary("model/policy_loss", pi_loss / bs)
-                tf.scalar_summary("model/value_loss", vf_loss / bs)
-                tf.scalar_summary("model/entropy", entropy / bs)
-                if brain in one_input_brain:
-                    tf.image_summary("model/state", pi.x)
-                tf.scalar_summary("model/grad_global_norm", tf.global_norm(grads))
-                tf.scalar_summary("model/var_global_norm", tf.global_norm(pi.var_list))
-                tf.scalar_summary("model/lr", self.lr)
-                self.summary_op = tf.merge_all_summaries()
+            tf.summary.scalar("model/policy_loss", pi_loss / bs)
+            tf.summary.scalar("model/value_loss", vf_loss / bs)
+            tf.summary.scalar("model/entropy", entropy / bs)
+            if brain in one_input_brain:
+                tf.summary.image("model/state", pi.x)
+            tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
+            tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list))
+            tf.summary.scalar("model/lr", self.lr)
+            self.summary_op = tf.summary.merge_all()
 
     def start(self, sess, summary_writer):
         self.runner.start_runner(sess, summary_writer)

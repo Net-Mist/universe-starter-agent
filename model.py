@@ -1,9 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.rnn as rnn
-import distutils.version
-
-use_tf100_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('1.0.0')
 
 
 def normalized_columns_initializer(std=1.0):
@@ -54,8 +51,7 @@ def categorical_sample(logits, d):
 
 class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
-        self.x = x = tf.placeholder(tf.float32, [None, 42, 42, 1],
-                                    name='X')  # tf.placeholder(tf.float32, [None] + list(ob_space))
+        self.x = x = tf.placeholder(tf.float32, [None, 42, 42, 1], name='X')
 
         for i in range(4):
             x = tf.nn.elu(conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2]))
@@ -63,10 +59,7 @@ class LSTMPolicy(object):
         x = tf.expand_dims(flatten(x), [0])
 
         size = 256
-        if use_tf100_api:
-            lstm = rnn.BasicLSTMCell(size, state_is_tuple=True)
-        else:
-            lstm = rnn.rnn_cell.BasicLSTMCell(size, state_is_tuple=True)
+        lstm = rnn.BasicLSTMCell(size, state_is_tuple=True)
         self.state_size = lstm.state_size
         step_size = tf.shape(self.x)[:1]
 
@@ -77,10 +70,7 @@ class LSTMPolicy(object):
         h_in = tf.placeholder(tf.float32, [1, lstm.state_size.h])
         self.state_in = [c_in, h_in]
 
-        if use_tf100_api:
-            state_in = rnn.LSTMStateTuple(c_in, h_in)
-        else:
-            state_in = rnn.rnn_cell.LSTMStateTuple(c_in, h_in)
+        state_in = rnn.LSTMStateTuple(c_in, h_in)
         lstm_outputs, lstm_state = tf.nn.dynamic_rnn(
             lstm, x, initial_state=state_in, sequence_length=step_size,
             time_major=False)
@@ -174,6 +164,7 @@ class VINPolicy(object):
         v = tf.expand_dims(v, 2)
         r = tf.expand_dims(r, 2)
         filters = None
+        q = None
         with tf.variable_scope('vi') as scope:
             for irec in range(30):
                 with tf.name_scope('iter%d' % irec):
@@ -189,8 +180,7 @@ class VINPolicy(object):
                     biases = tf.get_variable('bias', [ac_space], initializer=tf.constant_initializer(0.0))
                     q = tf.nn.bias_add(conv, biases, name="Q")
                     # activation_summary(Q)
-                    v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True,
-                                      name="V")  # TODO : reduction_indices is deprecated, use axis instead
+                    v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True, name="V")
 
         splits = tf.split(filters, ac_space, axis=2)
         for i in range(ac_space):
@@ -272,16 +262,18 @@ class VIN2DPolicy(object):
                 filter = tf.get_variable('filter', [3, 3, 32, 32],
                                          initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
                                          dtype=tf.float32)
-                deconv_shape = tf.pack([batch_size, 6, 6, 32])
-                conv = tf.nn.conv2d_transpose(hidden_state, filter, deconv_shape, [1, 2, 2, 1], padding='SAME')
+                # deconv_shape = tf.pack([batch_size, 6, 6, 32])
+                conv = tf.nn.conv2d_transpose(hidden_state, filter, [batch_size, 6, 6, 32], [1, 2, 2, 1],
+                                              padding='SAME')
                 bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
                 hidden_state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
             with tf.variable_scope('conv_transpose{}'.format(1)):
                 filter = tf.get_variable('filter', [3, 3, 1, 32],
                                          initializer=tf.truncated_normal_initializer(stddev=0.1, dtype=tf.float32),
                                          dtype=tf.float32)
-                deconv_shape = tf.pack([batch_size, 11, 11, 1])
-                conv = tf.nn.conv2d_transpose(hidden_state, filter, deconv_shape, [1, 2, 2, 1], padding='SAME')
+                # deconv_shape = tf.pack([batch_size, 11, 11, 1])
+                conv = tf.nn.conv2d_transpose(hidden_state, filter, [batch_size, 11, 11, 1], [1, 2, 2, 1],
+                                              padding='SAME')
                 bias = tf.get_variable('bias', [1], initializer=tf.constant_initializer(0.0))
                 state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
 
@@ -309,8 +301,8 @@ class VIN2DPolicy(object):
                                          initializer=tf.truncated_normal_initializer(stddev=0.1,
                                                                                      dtype=tf.float32),
                                          dtype=tf.float32)
-                deconv_shape = tf.pack([batch_size, 6, 6, 32])
-                conv = tf.nn.conv2d_transpose(hidden_state, filter, deconv_shape, [1, 2, 2, 1],
+                # deconv_shape = tf.pack([batch_size, 6, 6, 32])
+                conv = tf.nn.conv2d_transpose(hidden_state, filter, [batch_size, 6, 6, 32], [1, 2, 2, 1],
                                               padding='SAME')
                 bias = tf.get_variable('bias', [32], initializer=tf.constant_initializer(0.0))
                 hidden_state = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
@@ -319,8 +311,8 @@ class VIN2DPolicy(object):
                                          initializer=tf.truncated_normal_initializer(stddev=0.1,
                                                                                      dtype=tf.float32),
                                          dtype=tf.float32)
-                deconv_shape = tf.pack([batch_size, 11, 11, 1])
-                conv = tf.nn.conv2d_transpose(hidden_state, filter, deconv_shape, [1, 2, 2, 1],
+                # deconv_shape = tf.pack([batch_size, 11, 11, 1])
+                conv = tf.nn.conv2d_transpose(hidden_state, filter, [batch_size, 11, 11, 1], [1, 2, 2, 1],
                                               padding='SAME')
                 bias = tf.get_variable('bias', [1], initializer=tf.constant_initializer(0.0))
                 r = tf.nn.elu(tf.nn.bias_add(conv, bias, name="hidden"))
@@ -329,6 +321,7 @@ class VIN2DPolicy(object):
         v = tf.fill(tf.shape(r), 0.0)
         # v = tf.expand_dims(v, 3)
         # r = tf.expand_dims(r, 3)
+        q = None
         with tf.variable_scope('vi') as scope:
             for irec in range(30):
                 with tf.name_scope('iter%d' % irec):
@@ -466,6 +459,7 @@ class VINDeeperCNNPolicy(object):
         v = tf.expand_dims(v, 2)
         r = tf.expand_dims(r, 2)
         filters = None
+        q = None
         with tf.variable_scope('vi') as scope:
             for irec in range(30):
                 with tf.name_scope('iter%d' % irec):
