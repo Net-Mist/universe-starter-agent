@@ -87,8 +87,10 @@ def process_frame84(frame):
     return frame
 
 
-possible_model = ['LSTM', 'VIN', 'FF', 'FFWider', 'FFDeeper', 'FFWiderAndDeeper', 'VINDeeperCNN', 'DeepMind', 'VIN2D']
-one_input_brain = ['LSTM']  # List of the brain that use only one input frame. The rest of the input are RNN data
+possible_model = ['LSTM', 'VIN', 'FF', 'FFWider', 'FFDeeper', 'FFWiderAndDeeper', 'VINDeeperCNN', 'DeepMind', 'VIN2D',
+                  'VINLSTM']
+one_input_brain = ['LSTM',
+                   'VINLSTM']  # List of the brain that use only one input frame. The rest of the input are RNN data
 
 model_name_to_class = {
     'LSTM': LSTMPolicy,
@@ -99,7 +101,8 @@ model_name_to_class = {
     'FFWider': FFWiderPolicy,
     'FFDeeper': FFDeeperPolicy,
     'FFWiderAndDeeper': FFWiderAndDeeperPolicy,
-    'VIN2D': VIN2DPolicy
+    'VIN2D': VIN2DPolicy,
+    'VINLSTM': VINLSTMPolicy
 }
 
 model_name_to_process = {
@@ -111,5 +114,6 @@ model_name_to_process = {
     'FFDeeper': process_frame42_pos,
     'FFWiderAndDeeper': process_frame42_pos,
     'DeepMind': process_frame84,
-    'VIN2D': process_frame42_pos
+    'VIN2D': process_frame42_pos,
+    'VINLSTM': process_frame42_pos
 }
