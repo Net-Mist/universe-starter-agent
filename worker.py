@@ -22,7 +22,7 @@ class FastSaver(tf.train.Saver):
 
 
 def run(args, server, brain, learning_rate, local_steps, a3cp):
-    env = create_env(args.env_id, client_id=str(args.task), remotes=args.remotes)
+    env = create_env(args.env_id, record=args.record)
     trainer = A3C(env, args.task, args.visualise, args.visualiseVIN, brain, learning_rate, local_steps, a3cp,
                   args.initial_lr, args.max_t)
 
@@ -132,6 +132,8 @@ Setting up Tensorflow for data parallel work
                         help="the local steps. Default 20")
     parser.add_argument('--a3cp', action='store_true',
                         help="use A3C+ algorithm")
+    parser.add_argument('--record', action='store_true',
+                        help="Record the game")
 
     parser.add_argument('--max_t', default=0, type=int,
                         help="time step after then learning rate doesn't decrease anymore")

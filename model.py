@@ -157,7 +157,7 @@ class VINPolicy(object):
                                     initializer=normalized_columns_initializer(0.01))
                 b = tf.get_variable("b", [160], initializer=tf.constant_initializer(0))
                 r = tf.matmul(hidden_state, w) + b
-        self.r = r
+        self.reward = r
 
         # VIN Part
         v = tf.fill(tf.shape(r), 0.0)
@@ -885,7 +885,6 @@ class VINLSTMPolicy(object):
             Qa_img = tf.multiply(q, tf.tile(tf.expand_dims(self.state, 2), [1, 1, ac_space]), name='Qa_img')
             Qa = tf.reduce_sum(Qa_img, [1], name="Qa")
         self.logits = Qa
-
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):

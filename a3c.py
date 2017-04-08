@@ -5,6 +5,8 @@ import threading
 from models import *
 from pseudocount import PC
 import math
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def current_lr(t: int, max_t: int, initial_lr: float, final_lr: float) -> float:
@@ -372,7 +374,7 @@ server.
 
         # Visualise self.local_network.r and self.local_network.state
         if self.visualiseVIN:
-            fetches += [self.local_network.r, self.local_network.state]
+            fetches += [self.local_network.reward, self.local_network.state]
 
         cur_global_step = self.global_step.eval()
         if self.brain not in one_input_brain:
@@ -400,6 +402,20 @@ server.
         if self.visualiseVIN:
             print("r:", fetched[-2][0])
             print("state:", fetched[-1][0])
+            X = np.linspace(0, 160, 160, endpoint=False)
+            plt.subplot(211)
+            # Normalize data
+            reward_plot = fetched[-2][0] / np.max(fetched[-2][0])
+            state_plot = fetched[-1][0] / np.max(fetched[-1][0])
+            plt.plot(X, reward_plot, color="blue", linestyle="-", label="Reward")
+            plt.plot(X, state_plot, color="red", linestyle="-", label="State")
+            plt.legend(loc='upper left')
+            plt.subplot(212)
+            if self.brain not in one_input_brain:
+                plt.imshow(batch.si[0, 0, :, :])
+            else:
+                plt.imshow(batch.si[0, :, :, 0])
+            plt.show()
 
         if should_compute_summary:
             self.summary_writer.add_summary(tf.Summary.FromString(fetched[0]), fetched[2])

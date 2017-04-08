@@ -32,7 +32,8 @@ parser.add_argument('--visualise', action='store_true',
                     help="Visualise the gym environment by running env.render() between each timestep")
 parser.add_argument('--visualiseVIN', action='store_true',
                     help="Visualise the State and Reward tensors between each timestep")
-
+parser.add_argument('--record', action='store_true',
+                    help="Record the game")
 parser.add_argument('--max_t', default=0, type=int,
                     help="time step after then learning rate doesn't decrease anymore")
 parser.add_argument('--initial_lr', default=0, type=float,
@@ -55,7 +56,8 @@ def new_cmd(session, name, cmd, mode, logdir, shell):
 
 
 def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell='bash', mode='tmux', visualise=False,
-                    visualise_vin=False, learning_rate=1e-4, local_steps=20, a3cp=False, max_t=0, initial_lr=0):
+                    visualise_vin=False, learning_rate=1e-4, local_steps=20, a3cp=False, max_t=0, initial_lr=0,
+                    record=False):
     # for launching the TF workers and for launching tensorboard
     base_cmd = [
         'CUDA_VISIBLE_DEVICES=',
@@ -77,6 +79,9 @@ def create_commands(session, num_workers, remotes, env_id, logdir, brain, shell=
 
     if a3cp:
         base_cmd += ['--a3cp']
+
+    if record:
+        base_cmd += ['--record']
 
     if remotes is None:
         remotes = ["1"] * num_workers
@@ -146,7 +151,8 @@ def run():
                                   local_steps=args.local_steps,
                                   a3cp=args.a3cp,
                                   max_t=args.max_t,
-                                  initial_lr=args.initial_lr)
+                                  initial_lr=args.initial_lr,
+                                  record=args.record)
     if args.dry_run:
         print("Dry-run mode due to -n flag, otherwise the following commands would be executed:")
     else:
