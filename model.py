@@ -97,11 +97,8 @@ class LSTMPolicy(object):
 
 class VINPolicy(object):
     def __init__(self, ob_space, ac_space):
-        # self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
         self.x = tf.placeholder(tf.float32, [None, 4, 42, 42], name='X')
         x = tf.transpose(self.x, [0, 2, 3, 1], name='Xt')
-        # print(1, ob_space)(42, 42, 1)
-        # print(3, [None] + list(ob_space))[None, 42, 42, 1]
 
         # Compute the state
         with tf.variable_scope('State'):
@@ -196,23 +193,18 @@ class VINPolicy(object):
             Qa_img = tf.multiply(q, tf.tile(tf.expand_dims(state, 2), [1, 1, ac_space]), name='Qa_img')
             Qa = tf.reduce_sum(Qa_img, [1], name="Qa")
 
-        # reactive policy (dense layer with softmax?)
         with tf.name_scope('softmax_linear'):
-            w = tf.get_variable("w", [ac_space, ac_space],
-                                initializer=normalized_columns_initializer(0.01))
-            biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
-
-            self.logits = tf.matmul(Qa, w) + biases
-            softact = tf.nn.softmax(self.logits, name='softact')
+            # w = tf.get_variable("w", [ac_space, ac_space],
+            #                     initializer=normalized_columns_initializer(0.01))
+            # biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
+            # self.logits = tf.matmul(Qa, w) + biases
+            self.logits = Qa
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):
             self.vf = tf.multiply(tf.reduce_sum(v, [2]), state, name='Vf_img')
             self.vf = tf.reduce_sum(self.vf, [1], name="Vf")
 
-        # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
-        # self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
-        # self.state_out = [None, None]
         self.sample = categorical_sample(self.logits, ac_space)[0, :]
         self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
 
@@ -338,30 +330,27 @@ class VIN2DPolicy(object):
                     q = tf.nn.bias_add(conv, biases, name="Q")
                     # activation_summary(Q)
                     v = tf.reduce_max(q, reduction_indices=[3], keep_dims=True,
-                                      name="V")  # TODO : reduction_indices is deprecated, use axis instead
+                                      name="V")
 
-        # attention part
+                    # attention part
         with tf.name_scope('attention'):
             Qa_img = tf.multiply(q, tf.tile(state, [1, 1, 1, ac_space]), name='Qa_img')
             Qa = tf.reduce_sum(Qa_img, [1, 2], name="Qa")
 
         # reactive policy (dense layer with softmax?)
         with tf.name_scope('softmax_linear'):
-            w = tf.get_variable("w", [ac_space, ac_space],
-                                initializer=normalized_columns_initializer(0.01))
-            biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
-
-            self.logits = tf.matmul(Qa, w) + biases
-            softact = tf.nn.softmax(self.logits, name='softact')
+            # w = tf.get_variable("w", [ac_space, ac_space],
+            #                     initializer=normalized_columns_initializer(0.01))
+            # biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
+            #
+            # self.logits = tf.matmul(Qa, w) + biases
+            self.logits = Qa
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):
             self.vf = tf.multiply(v, state, name='Vf_img')
             self.vf = tf.reduce_sum(self.vf, [1, 2, 3], name="Vf")
 
-        # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
-        # self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
-        # self.state_out = [None, None]
         self.sample = categorical_sample(self.logits, ac_space)[0, :]
         self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
 
@@ -476,7 +465,7 @@ class VINDeeperCNNPolicy(object):
                     q = tf.nn.bias_add(conv, biases, name="Q")
                     # activation_summary(Q)
                     v = tf.reduce_max(q, reduction_indices=[2], keep_dims=True,
-                                      name="V")  # TODO : reduction_indices is deprecated, use axis instead
+                                      name="V")
 
         splits = tf.split(filters, ac_space, axis=2)
         for i in range(ac_space):
@@ -494,21 +483,18 @@ class VINDeeperCNNPolicy(object):
 
         # reactive policy (dense layer with softmax?)
         with tf.name_scope('softmax_linear'):
-            w = tf.get_variable("w", [ac_space, ac_space],
-                                initializer=normalized_columns_initializer(0.01))
-            biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
-
-            self.logits = tf.matmul(Qa, w) + biases
-            softact = tf.nn.softmax(self.logits, name='softact')
+            # w = tf.get_variable("w", [ac_space, ac_space],
+            #                     initializer=normalized_columns_initializer(0.01))
+            # biases = tf.get_variable('b_policy', [ac_space], initializer=tf.constant_initializer(0.0))
+            #
+            # self.logits = tf.matmul(Qa, w) + biases
+            self.logits = Qa
 
         # Second attention part for the V_f computation
         with tf.name_scope('attention2'):
             self.vf = tf.multiply(tf.reduce_sum(v, [2]), state, name='Vf_img')
             self.vf = tf.reduce_sum(self.vf, [1], name="Vf")
 
-        # logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
-        # self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
-        # self.state_out = [None, None]
         self.sample = categorical_sample(self.logits, ac_space)[0, :]
         self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
 

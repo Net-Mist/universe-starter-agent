@@ -20,7 +20,7 @@ def process_frame42_downsampled(frame):
     frame = cv2.resize(frame, (42, 42))
     # downsampled the image
     frame = frame.astype(np.float32)
-    frame = np.uint8(frame / 255 * 8)  # TODO 8 in the paper, buy maybe try another value (128 ?)
+    frame = np.uint8(frame / 255 * 8)
 
     # Final reshape
     frame = np.reshape(frame, [42, 42, 1])
@@ -45,7 +45,7 @@ def process_frame42_v2(frame):
     frame = cv2.resize(frame, (42, 42))
     # downsampled the image
     frame = frame.astype(np.uint8)
-    frame *= 8. / 255.  # TODO 8 in the paper, buy maybe try another value (128 ?)
+    frame *= 8. / 255.
 
     # Final
     frame = frame.astype(np.float32)

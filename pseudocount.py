@@ -1,7 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# File: pseudocount.py
-# Author: Music Li <yuezhanl@andrew.cmu.edu>
+# This part is highly inspired from the work of Music Li <yuezhanl@andrew.cmu.edu>, https://github.com/pkumusic/E-DRL
 from __future__ import division
 import cv2
 import numpy as np

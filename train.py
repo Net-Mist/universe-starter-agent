@@ -34,6 +34,8 @@ parser.add_argument('--visualiseVIN', action='store_true',
                     help="Visualise the State and Reward tensors between each timestep")
 parser.add_argument('--record', action='store_true',
                     help="Record the game")
+
+# Add learning rate tag
 parser.add_argument('--max_t', default=0, type=int,
                     help="time step after then learning rate doesn't decrease anymore")
 parser.add_argument('--initial_lr', default=0, type=float,
